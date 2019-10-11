@@ -12,7 +12,7 @@ spring:
     user:
       name: "cnc-user"
       password: "cnc-non-secure-basic-auth-password"
-    
+
 org.n52.stream:
   sosendpoint: http://sos:8080/52n-sos-webapp/service
   dataflowhost: http://dataflow:9393
