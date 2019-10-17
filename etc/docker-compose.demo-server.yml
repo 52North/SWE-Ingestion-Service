@@ -1,6 +1,6 @@
 ################################################################################
 #                                                                              #
-#    Copyright (C) 2018-2018 52°North Initiative for Geospatial Open Source    #
+#    Copyright (C) 2018-2019 52°North Initiative for Geospatial Open Source    #
 #    Software GmbH                                                             #
 #                                                                              #
 #    This program is free software; you can redistribute it and/or modify it   #
@@ -33,16 +33,21 @@
 #   Before starting:                                                           #
 #     - update all volumne path starting with ADJUST_ME to match               #
 #       your local set-up                                                      #
-#     - requies environment where PWD is supported (git bash under             #
+#     - requires environment where PWD is supported (git bash under            #
 #       windows).                                                              #
 #                                                                              #
 #   Start via PROJECT_ROOT:$ docker-compose --file etc/docker-compose.yml up   #
+#                                                                              #
+#   To Restart:                                                                #
+#       sudo rm -r database/pgdata/*; && \                                     #
+#       rm cnc/pds.dat ; touch cnc/pds.dat ; && \                              #
+#       sudo rm -r elasticsearch/data/*;  && \                                 #
+#       sudo rm sos/52n-sos-webapp/cache.tmp                                   #
 #                                                                              #
 ################################################################################
 
 
 version: '3'
-
 
 ################################################################################
 #                                                                              #

@@ -306,7 +306,7 @@ On success, the response status code is 204 - `no content` and the stream is run
     <?xml version="1.0" encoding="UTF-8"?>
     <!--
 
-        Copyright (C) 2018-2018 52°North Initiative for Geospatial Open Source
+        Copyright (C) 2018-2019 52°North Initiative for Geospatial Open Source
         Software GmbH
 
         This program is free software; you can redistribute it and/or modify it
@@ -682,7 +682,7 @@ On success, the response status code is 204 - `no content` and the stream is run
     <?xml version="1.0" encoding="UTF-8"?>
     <!--
 
-        Copyright (C) 2018-2018 52°North Initiative for Geospatial Open Source
+        Copyright (C) 2018-2019 52°North Initiative for Geospatial Open Source
         Software GmbH
 
         This program is free software; you can redistribute it and/or modify it
