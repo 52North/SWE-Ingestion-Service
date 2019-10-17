@@ -1,0 +1,325 @@
+################################################################################
+#                                                                              #
+#    Copyright (C) 2018-2019 52°North Initiative for Geospatial Open Source    #
+#    Software GmbH                                                             #
+#                                                                              #
+#    This program is free software; you can redistribute it and/or modify it   #
+#    under the terms of the GNU General Public License version 2 as published  #
+#    by the Free Software Foundation.                                          #
+#                                                                              #
+#    If the program is linked with libraries which are licensed under one of   #
+#    the following licenses, the combination of the program with the linked    #
+#    library is not considered a "derivative work" of the program:             #
+#                                                                              #
+#        - Apache License, version 2.0                                         #
+#        - Apache Software License, version 1.0                                #
+#        - GNU Lesser General Public License, version 3                        #
+#        - Mozilla Public License, versions 1.0, 1.1 and 2.0                   #
+#        - Common Development and Distribution License (CDDL), version 1.0     #
+#                                                                              #
+#    Therefore the distribution of the program linked with libraries licensed  #
+#    under the aforementioned licenses, is permitted by the copyright holders  #
+#    if the distribution is compliant with both the GNU General Public         #
+#    License version 2 and the aforementioned licenses.                        #
+#                                                                              #
+#    This program is distributed in the hope that it will be useful, but       #
+#    WITHOUT ANY WARRANTY; without even the implied warranty of                #
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General  #
+#    Public License for more details.                                          #
+#                                                                              #
+################################################################################
+#                                                                              #
+#                                                                              #
+#   Before starting:                                                           #
+#     - update all volumne path starting with ADJUST_ME to match               #
+#       your local set-up                                                      #
+#     - requires environment where PWD is supported (git bash under            #
+#       windows).                                                              #
+#                                                                              #
+#   Start via PROJECT_ROOT:$ docker-compose --file etc/docker-compose.yml up   #
+#                                                                              #
+#   To Restart:                                                                #
+#       sudo rm -r database/pgdata/*; && \                                     #
+#       rm cnc/pds.dat ; touch cnc/pds.dat ; && \                              #
+#       sudo rm -r elasticsearch/data/*;  && \                                 #
+#       sudo rm sos/52n-sos-webapp/cache.tmp                                   #
+#                                                                              #
+################################################################################
+
+
+version: '3'
+
+################################################################################
+#                                                                              #
+#                     Services                                                 #
+#                                                                              #
+################################################################################
+services:
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    networks:
+      network:
+        ipv4_address: 172.52.0.101
+
+################################################################################
+#
+#     DATAFLOW
+#
+#
+  dataflow:
+    image: springcloud/spring-cloud-dataflow-server-local:1.5.0.RELEASE
+    container_name: dataflow
+    environment:
+      - spring.cloud.dataflow.applicationProperties.stream.spring.rabbitmq.host=rabbitmq
+      - spring.cloud.config.enabled=false
+      - server.contextPath=/dataflow
+    volumes:
+      - "${PWD}/dataflow/apps/:/tmp/apps/"
+    depends_on:
+      - rabbitmq
+      - logstash
+    networks:
+      network:
+        ipv4_address: 172.52.0.102
+
+################################################################################
+#
+#     DATABASE
+#
+#
+  database:
+    container_name: database
+    image: mdillon/postgis:9.5-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=sos
+    volumes:
+      - "${PWD}/database/sos-init.sql:/docker-entrypoint-initdb.d/zz_sos_init.sql"
+      - "${PWD}/database/pgdata:/var/lib/postgresql/data"
+    networks:
+      network:
+        ipv4_address: 172.52.0.103
+
+################################################################################
+#
+#     SOS
+#
+#
+  sos:
+    image: tomcat:9-jre8-alpine
+    container_name: sos
+    volumes:
+      - "${PWD}/sos/52n-sos-webapp:/usr/local/tomcat/webapps/52n-sos-webapp"
+      - "${PWD}/sos/datasource.properties:/usr/local/tomcat/webapps/52n-sos-webapp/WEB-INF/datasource.properties"
+      - "${PWD}/sos/configuration.json:/usr/local/tomcat/webapps/52n-sos-webapp/configuration.json"
+      - "${PWD}/sos/settings.json:/usr/local/tomcat/webapps/52n-sos-webapp/static/client/helgoland/settings.json"
+      - "${PWD}/sos/application.properties:/usr/local/tomcat/webapps/52n-sos-webapp/WEB-INF/classes/application.properties"
+      - "${PWD}/sos/application-context.xml:/usr/local/tomcat/webapps/52n-sos-webapp/WEB-INF/spring/application-context.xml"
+      - "${PWD}/sos/tomcat-index.html:/usr/local/tomcat/webapps/ROOT/index.html"
+    depends_on:
+      - database
+    networks:
+      network:
+        ipv4_address: 172.52.0.104
+
+################################################################################
+#
+#     C&C
+#
+#
+  cnc:
+    image: openjdk:8-jdk-alpine
+    container_name: cnc
+    volumes:
+      - "${PWD}/cnc/rest-controller-0.0.1-SNAPSHOT.jar:/tmp/service.jar"
+      - "${PWD}/etc/cnc/pds.dat:/tmp/pds.dat"
+    command: [
+      "java",
+      "-jar",
+      "/tmp/service.jar",
+      "--server.port=8082",
+      "--server.servlet.contextPath=/cnc",
+      "--org.n52.stream.sosendpoint=http://sos:8080/52n-sos-webapp/service",
+      "--org.n52.stream.dataflowhost=http://dataflow:9393/dataflow",
+      "--org.n52.stream.baseurl=https://oceans.dev.52north.org/cnc",
+      "--org.n52.stream.kibana=http://kibana:5601",
+      "--org.n52.stream.datasource.url=jdbc:postgresql://database:5432/sos",
+      "--org.n52.stream.datasource.username=postgres",
+      "--org.n52.stream.datasource.password=postgres",
+      "--security.user.name=cnc-user",
+      "--security.user.password=cnc-non-secure-basic-auth-password"
+    ]
+    depends_on:
+      - dataflow
+      - logstash
+    networks:
+      network:
+        ipv4_address: 172.52.0.105
+
+################################################################################
+#
+#     APP_IMPORT
+#
+#
+  app-import:
+    image: alpine:3.7
+    container_name: app-import
+    depends_on:
+      - dataflow
+    command: >
+      /bin/sh -c "
+        while ! nc -z dataflow 9393;
+        do
+          sleep 1;
+        done;
+        wget -qO- 'http://dataflow:9393/dataflow/apps/source/ftp-source' --post-data='uri=file:///tmp/apps/sources/ftp-source-rabbit-1.3.2.BUILD-SNAPSHOT.jar&force=true';
+        echo 'FTP Source app imported'
+        wget -qO- 'http://dataflow:9393/dataflow/apps/source/sftp-source' --post-data='uri=file:///tmp/apps/sources/sftp-source-rabbit-1.3.2.BUILD-SNAPSHOT.jar&force=true';
+        echo 'SFTP Source app imported'
+        wget -qO- 'http://dataflow:9393/dataflow/apps/source/mqtt-source-rabbit' --post-data='uri=file:///tmp/apps/sources/mqtt-source-rabbit-2.0.0.BUILD-SNAPSHOT.jar&force=true';
+        echo 'MQTT Source Rabbit app imported'
+        wget -qO- 'http://dataflow:9393/dataflow/apps/processor/csv-processor' --post-data='uri=file:///tmp/apps/processors/csv-processor-0.0.1-SNAPSHOT.jar&force=true';
+        echo 'CsvProcessor app imported'
+        wget -qO- 'http://dataflow:9393/dataflow/apps/sink/db-sink' --post-data='uri=file:///tmp/apps/sinks/db-sink-0.0.1-SNAPSHOT.jar&force=true';
+        echo 'DbSink app imported'
+        wget -qO- 'http://dataflow:9393/dataflow/apps/sink/log-sink' --post-data='uri=file:///tmp/apps/sinks/log-sink-0.0.1-SNAPSHOT.jar&force=true';
+        echo 'LogSink app imported'"
+        wget -qO- 'http://dataflow:9393/dataflow/apps/processor/csv-file-filter' --post-data='uri=file:///tmp/apps/processors/csv-file-filter-0.0.1-SNAPSHOT.jar&force=true';
+        echo 'CsvFileFilter app imported'
+        wget -qO- 'http://dataflow:9393/dataflow/apps/processor/csv-timestamp-filter' --post-data='uri=file:///tmp/apps/processors/csv-timestamp-filter-0.0.1-SNAPSHOT.jar&force=true';
+        echo 'CsvTimestampFilter app imported'
+    networks:
+      network:
+        ipv4_address: 172.52.0.106
+
+################################################################################
+#
+#     SMLE
+#
+#
+# Replace in ./smle/www/smle/index.html <base href="/"> with <base href="/smle/">
+  smle:
+    image: nginx:alpine
+    container_name: smle
+    depends_on:
+      - cnc
+    volumes:
+      - "${PWD}/smle/www:/usr/share/nginx/html"
+      - "${PWD}/smle/smle_nginx.conf:/etc/nginx/conf.d/default.conf"
+    networks:
+      network:
+        ipv4_address: 172.23.25.107
+
+################################################################################
+#
+#     ELASTICSEARCH
+#
+#
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch-oss:6.2.4
+    container_name: elasticsearch
+    environment:
+      - ELASTIC_PASSWORD=changeme
+    volumes:
+      - "${PWD}/elasticsearch/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml"
+      - "${PWD}/elasticsearch/data:/usr/share/elasticsearch/data"
+    networks:
+      network:
+        ipv4_address: 172.52.0.108
+
+################################################################################
+#
+#     KIBANA
+#
+#
+  kibana :
+    image: docker.elastic.co/kibana/kibana-oss:6.2.4
+    container_name: kibana
+    volumes:
+      - "${PWD}/kibana/kibana.yml:/usr/share/kibana/config/kibana.yml"
+    networks:
+      network:
+        ipv4_address: 172.52.0.109
+    depends_on:
+      - elasticsearch
+
+################################################################################
+#
+#     LOGSTASH
+#
+#
+  logstash :
+    image: docker.elastic.co/logstash/logstash-oss:6.2.4
+    container_name: logstash
+    volumes:
+      - "${PWD}/logstash/logstash.yml/:/usr/share/logstash/config/logstash.yml"
+      - "${PWD}/logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf"
+    networks:
+      network:
+        ipv4_address: 172.52.0.110
+    depends_on:
+      - elasticsearch
+
+################################################################################
+#
+#     LANDINGPAGE
+#
+#
+  landingpage:
+    image: nginx:latest
+    container_name: landingpage
+    volumes:
+      - "./landingpage/nginx-proxy.conf:/etc/nginx/conf.d/default.conf"
+      - "./landingpage/nginx-index.html:/usr/share/nginx/html/index.html"
+      - "/etc/letsencrypt/live/oceans.dev.52north.org/fullchain.pem:/etc/letsencrypt/live/oceans.dev.52north.org/fullchain.pem"
+      - "/etc/letsencrypt/live/oceans.dev.52north.org/privkey.pem:/etc/letsencrypt/live/oceans.dev.52north.org/privkey.pem"
+      - "/etc/ssl/certs/dhparam.pem:/etc/ssl/certs/dhparam.pem"
+    ports:
+      - 80:80
+      - 443:443
+    networks:
+      network:
+        ipv4_address: 172.52.0.111
+    depends_on:
+      - sos
+      - cnc
+      - smle
+      - dataflow
+      - kibana
+
+################################################################################
+#
+#     Helgoland
+#
+#
+  helgoland:
+    build:
+      context: ./helgoland
+    container_name: helgoland
+    volumes:
+      - "${PWD}/helgoland/nginx.conf:/etc/nginx/conf.d/default.conf"
+    networks:
+      network:
+        ipv4_address: 172.52.0.112
+
+################################################################################
+#                                                                              #
+#                     Networks                                                 #
+#                                                                              #
+################################################################################
+networks:
+  network:
+    driver: bridge
+    ipam:
+      config:
+      - subnet: 172.52.0.0/24
+
+
+################################################################################
+#                                                                              #
+#                     END OF FILE                                              #
+#                                                                              #
+################################################################################
