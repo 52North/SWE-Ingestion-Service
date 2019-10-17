@@ -737,11 +737,9 @@ public class StreamController {
         String result = service.deleteStream(streamId);
         processDescriptionStore.deleteProcessDescription(streamId);
         // store latest updates processDescriptionStore into file:
-        try (ObjectOutputStream o = new ObjectOutputStream(f)) {
-            f = new FileOutputStream(new File(processDescriptionStoreFileName));
+        try (ObjectOutputStream o = new ObjectOutputStream(new FileOutputStream(
+                new File(processDescriptionStoreFileName)))) {
             o.writeObject(processDescriptionStore);
-            o.close();
-            f.close();
             return new ResponseEntity<>(result, CONTENT_TYPE_APPLICATION_JSON, HttpStatus.NO_CONTENT);
 
         } catch (FileNotFoundException ex) {
