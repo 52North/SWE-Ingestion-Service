@@ -50,7 +50,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
 
 import javax.annotation.PostConstruct;
 
@@ -338,7 +337,7 @@ public class StreamController {
                     // httpClientProcessor appOptions+
                     Object rabbitSourceDefinition = getTimeSourceDefinition(al, (LinkedList<SweField>) sdr.getFields());
                     if (rabbitSourceDefinition instanceof ResponseEntity) {
-                        return (ResponseEntity) rabbitSourceDefinition;
+                        return (ResponseEntity<?>) rabbitSourceDefinition;
                     }
                     streamSourceDefinition = (String) rabbitSourceDefinition;
                 } else {
@@ -729,12 +728,11 @@ public class StreamController {
      */
     @CrossOrigin(origins = "*")
     @DeleteMapping(value = "/{streamId}", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<String> deleteStream(
-            @PathVariable String streamId) {
-        FileOutputStream f = null;
+    public ResponseEntity<String> deleteStream(@PathVariable String streamId) {
         Stream stream = service.getStream(streamId);
         if (stream == null) {
-            return new ResponseEntity<>("{\"error\":\"Stream '" + streamId + "' not found.\"}", CONTENT_TYPE_APPLICATION_JSON, HttpStatus.NOT_FOUND);
+            return new ResponseEntity<>("{\"error\":\"Stream '" + streamId + "' not found.\"}",
+                    CONTENT_TYPE_APPLICATION_JSON, HttpStatus.NOT_FOUND);
         }
         String result = service.deleteStream(streamId);
         processDescriptionStore.deleteProcessDescription(streamId);
@@ -747,12 +745,16 @@ public class StreamController {
             return new ResponseEntity<>(result, CONTENT_TYPE_APPLICATION_JSON, HttpStatus.NO_CONTENT);
 
         } catch (FileNotFoundException ex) {
-            java.util.logging.Logger.getLogger(StreamController.class
-                    .getName()).log(Level.SEVERE, null, ex);
+            LOG.error("Could not find Process Description Store: {}. Exception: {}",
+                    processDescriptionStoreFileName,
+                    ex.getMessage());
+            LOG.debug("Exception thrown:", ex);
 
         } catch (IOException ex) {
-            java.util.logging.Logger.getLogger(StreamController.class
-                    .getName()).log(Level.SEVERE, null, ex);
+            LOG.error("Could not update Process Description Store: {}. Exception: {}",
+                    processDescriptionStoreFileName,
+                    ex.getMessage());
+            LOG.debug("Exception thrown:", ex);
         }
         return new ResponseEntity<>(result, CONTENT_TYPE_APPLICATION_JSON, HttpStatus.NO_CONTENT);
     }
@@ -878,7 +880,9 @@ public class StreamController {
     }
 
     protected String getDateTime(GetDataAvailabilityResponse respoonse) {
-        if (respoonse != null && respoonse.getDataAvailabilities() != null && !respoonse.getDataAvailabilities().isEmpty()) {
+        if (respoonse != null &&
+                respoonse.getDataAvailabilities() != null &&
+                !respoonse.getDataAvailabilities().isEmpty()) {
             for (DataAvailability da : respoonse.getDataAvailabilities()) {
                 if (!da.getPhenomenonTime().isReferenced()) {
                     return da.getPhenomenonTime().getEnd().toString();
@@ -892,7 +896,8 @@ public class StreamController {
         return generator.generate(process);
     }
 
-    protected Object executeRequest(OwsServiceRequest request) throws XmlDecodingException, DecodingException, EncodingException, URISyntaxException {
+    protected Object executeRequest(OwsServiceRequest request)
+            throws XmlDecodingException, DecodingException, EncodingException, URISyntaxException {
         // encode request
         XmlObject xbRequest = encoderHelper.encode(request);
         String insertSensor = xbRequest.xmlText();
