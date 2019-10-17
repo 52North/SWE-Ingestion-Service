@@ -82,7 +82,7 @@ function sendMessage(client) {
   var msg = createMessage(updateValues(values));
 
   client.publish(mqttTopic, msg, null, () => {
-    console.log(`message published in ${mqttTopic}: ${msg}`, ...arguments);
+    console.log(`message published in ${mqttTopic}: ${msg}`);
   });
 
   setTimeout(() => sendMessage(client), frequency);
@@ -93,7 +93,7 @@ function updateValues(values) {
     const prev = v.value;
     let min, max;
 
-    if (v.trendChangeProbability) {
+    if (v.trendChangeProbability !== null || v.trendChangeProbalitiy !== undefined) {
       if (
         prev === v.min ||
         prev === v.max ||
@@ -114,7 +114,6 @@ function updateValues(values) {
     }
 
     v.value = randomize(min, max);
-    v.trend = v.value <= prev ? -1 : 1;
   }
   return values;
 }

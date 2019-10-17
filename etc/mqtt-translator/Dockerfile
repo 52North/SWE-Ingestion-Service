@@ -25,10 +25,10 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
 # Public License for more details.
 FROM node:9.10.1
-COPY ./*.js /app/
 COPY ./*.json /app/
 RUN cd /app/ && \
     npm install
+COPY ./*.js /app/
 WORKDIR /app
 USER node
 EXPOSE 1883
