@@ -1,6 +1,6 @@
-#### status: in development process
+# ARCHIVED
 
-[![Build Status](https://travis-ci.org/52North/SWE-Ingestion-Service.svg?branch=dev)](https://travis-ci.org/52North/SWE-Ingestion-Service)
+This project is no longer maintained and will not receive any further updates. If you plan to continue using it, please be aware that future security issues will not be addressed.
 
 # SWE-Ingestion-Service
 
